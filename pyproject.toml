@@ -1,0 +1,13 @@
+[project]
+name = "bihar-eu"
+version = "0.1.0"
+description = "BEU results fetcher: fetch and save student results as JSON + CSV"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.28.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

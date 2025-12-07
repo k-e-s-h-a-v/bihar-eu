@@ -1,0 +1,64 @@
+Metadata-Version: 2.4
+Name: bihar-eu
+Version: 0.1.0
+Summary: BEU results fetcher: fetch and save student results as JSON + CSV
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.28.0
+
+# BEU Results Fetcher
+
+Small Python script to fetch student result payloads from BEU and save each payload as JSON and a combined CSV summary.
+
+Files added
+- `fetch_results.py` - main script. Uses `requests` and `ThreadPoolExecutor` to fetch results in parallel.
+- `requirements.txt` - lists `requests`.
+
+Usage
+
+1. Install dependencies:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+2. Run the script for a range of register numbers (example):
+
+```bash
+python3 fetch_results.py --start 23105108001 --end 23105108060 --concurrency 12
+```
+
+Default output directory is `./results_json`. Each successful payload is saved as `{redg_no}_{name}.json`. A CSV summary `results.csv` is written into that folder.
+
+Notes
+- The script uses a common browser-like User-Agent and Referer header. If the remote server requires a cookie or other headers, you can modify `HEADERS` in `fetch_results.py`.
+- Be respectful of the remote server: choose a reasonable concurrency and avoid hammering the endpoint.
+
+Using uv
+
+This repository is now a `uv`-compatible project (see https://docs.astral.sh/uv/). You can use `uv` to create an isolated environment and run the script with the declared dependencies.
+
+1) Install `uv` (see uv docs). On macOS/Linux you can use the installer:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+2) Create a venv (optional) and sync dependencies declared in `pyproject.toml`:
+
+```bash
+uv venv
+uv sync
+```
+
+3) Run the fetcher using uv (the project dependencies will be installed automatically when you run):
+
+```bash
+uv run python fetch_results.py -- --start 23105108001 --end 23105108060 --concurrency 12
+```
+
+Notes on the command:
+- The `--` after `fetch_results.py` separates `uv` options from the script arguments in some shells. If you prefer, you can also run `uv run -- python fetch_results.py --start ...`.
+- Alternatively, to run the script without the project environment, you can use `uv run --no-project --with requests fetch_results.py -- --start ...`.
+
+If you want the script to be runnable directly with `uv run --script`, I can add inline script metadata at the top of `fetch_results.py` (depends vs project behavior). Let me know which behavior you prefer.
