@@ -12,57 +12,19 @@ import argparse
 import csv
 import json
 import os
-import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, Optional
 
 import requests
 
+from constants.url import BASE_URL, HEADERS
+from constants.third_sem_cse_subjects import CSV_FIELDNAMES, THEORY_SUBJECTS, PRACTICAL_SUBJECTS
+
+from utils.save_json import save_json
+from utils.append import append_csv_row, append_not_found
+
 DEFAULT_OUTPUT_DIR = "results_json"
-
-HEADERS = {
-    "Accept": "application/json, text/plain, */*",
-    # A common browser UA helps avoid simple blocks
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
-    "Referer": "https://beu-bih.ac.in/result-two/",
-    "DNT": "1",
-    "sec-gpc": "1",
-}
-
-BASE_URL = "https://beu-bih.ac.in/backend/v1/result/get-result"
-
-# Hardcoded CSV header fields derived from sample-response.json (so the CSV columns are stable).
-# The theory/practical subject names are taken from `sample-response.json` and used verbatim here.
-CSV_FIELDNAMES = [
-    "redg_no",
-    "name",
-    "father_name",
-    "mother_name",
-    "examYear",
-    "semester",
-    "exam_held",
-    "cgpa",
-    "sgpa",
-    "fail_any",
-]
-
-# Theory subjects from sample-response.json
-THEORY_SUBJECTS = [
-    "ANALOG ELECTRONIC CIRCUITS",
-    "DATA STRUCTURE & ALGORITHMS",
-    "MATHEMATICS-III (DIFFERENTIAL CALCULUS)",
-    "OBJECT ORIENTED PROGRAMMING USING C++",
-    "TECHNICAL WRITING",
-]
-
-# Practical subjects from sample-response.json
-PRACTICAL_SUBJECTS = [
-    "Analog Electronics Circuits Laboratory",
-    "DATA STRUCTURE & ALGORITHMS",
-    "OBJECT ORIENTED PROGRAMMING USING C++",
-    "Internship",
-]
 
 # Extend CSV_FIELDNAMES with subject-specific columns (ESE and IA for theory and practical)
 for subj in THEORY_SUBJECTS:
@@ -72,15 +34,6 @@ for subj in THEORY_SUBJECTS:
 for subj in PRACTICAL_SUBJECTS:
     CSV_FIELDNAMES.append(f"{subj} PRACTICAL ESE")
     CSV_FIELDNAMES.append(f"{subj} PRACTICAL IA")
-
-
-
-def sanitize_filename(s: str) -> str:
-    s = s.strip()
-    # replace spaces with underscore and remove problematic characters
-    s = re.sub(r"\s+", "_", s)
-    s = re.sub(r"[^A-Za-z0-9_\-\.]+", "", s)
-    return s or "unknown"
 
 
 def fetch_result(session: requests.Session, redg_no: int, year: int = 2024, semester: str = "III", exam_held: str = "July/2025", timeout: int = 10) -> Optional[Dict]:
@@ -113,36 +66,6 @@ def fetch_result(session: requests.Session, redg_no: int, year: int = 2024, seme
             if attempt == tries:
                 return None
     return None
-
-
-def save_json(output_dir: str, redg_no: int, name: str, payload: Dict) -> str:
-    safe_name = sanitize_filename(name)
-    filename = f"{redg_no}_{safe_name}.json"
-    path = os.path.join(output_dir, filename)
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(payload.get("data", {}), fh, ensure_ascii=False, indent=2)
-    return path
-
-
-def append_csv_row(csv_path: str, row: Dict, lock: threading.Lock):
-    write_header = not os.path.exists(csv_path)
-    with lock:
-        with open(csv_path, "a", newline="", encoding="utf-8") as fh:
-            # use the hardcoded CSV_FIELDNAMES so column order is stable
-            writer = csv.DictWriter(fh, fieldnames=CSV_FIELDNAMES)
-            if write_header:
-                writer.writeheader()
-            # ensure all fields are present (missing -> empty string)
-            full_row = {k: (row.get(k) if k in row else "") for k in CSV_FIELDNAMES}
-            writer.writerow(full_row)
-
-
-def append_not_found(output_dir: str, redg_no: int, lock: threading.Lock):
-    """Append a registration number to not_found.txt in a thread-safe way."""
-    path = os.path.join(output_dir, "not_found.txt")
-    with lock:
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write(f"{redg_no}\n")
 
 
 def process_redg(session: requests.Session, redg_no: int, output_dir: str, csv_path: str, lock: threading.Lock) -> Optional[int]:
@@ -194,7 +117,7 @@ def process_redg(session: requests.Session, redg_no: int, output_dir: str, csv_p
         row[f"{subj} PRACTICAL ESE"] = entry.get("ese") if entry else ""
         row[f"{subj} PRACTICAL IA"] = entry.get("ia") if entry else ""
 
-    append_csv_row(csv_path, row, lock)
+    append_csv_row(csv_path, row, lock, CSV_FIELDNAMES)
     print(f"{redg_no}: saved JSON -> {saved_path}")
     return redg_no
 
